@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""
     allowed_telegram_ids: str = ""
+    mini_app_url: str = ""
 
     jwt_secret: str = "change-me"
 

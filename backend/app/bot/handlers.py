@@ -1,6 +1,12 @@
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    WebAppInfo,
+)
 from sqlalchemy import select
 
 from app.assistant.chat import ask_assistant
@@ -13,6 +19,7 @@ from app.assistant.service import (
 )
 from app.assistant.summary import rebuild_patient_summary
 from app.auth.service import get_or_create_user
+from app.core.config import settings
 from app.core.db import async_session_maker
 from app.core.queue import get_arq_pool
 from app.documents.models import Document, DocumentKind
@@ -35,7 +42,14 @@ QUESTIONS_TRIGGERS = {"/questions", "вопросы к врачу", "вопро�
 
 @router.message(CommandStart())
 async def handle_start(message: Message) -> None:
-    await message.answer(WELCOME_TEXT)
+    keyboard = None
+    if settings.mini_app_url:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="📊 Открыть панель", web_app=WebAppInfo(url=settings.mini_app_url))]
+            ]
+        )
+    await message.answer(WELCOME_TEXT, reply_markup=keyboard)
 
 
 @router.message(F.photo | F.document)

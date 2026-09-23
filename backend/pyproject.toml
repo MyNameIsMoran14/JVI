@@ -17,6 +17,7 @@ dependencies = [
     "pdf2image>=1.17",
     "rapidfuzz>=3.10",
     "pyyaml>=6.0",
+    "pyjwt>=2.9",
 ]
 
 [project.optional-dependencies]
