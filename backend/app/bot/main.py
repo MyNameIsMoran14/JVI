@@ -5,6 +5,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+import app.core.all_models  # noqa: F401
 from app.bot.handlers import router
 from app.bot.middlewares import WhitelistMiddleware
 from app.core.config import settings
