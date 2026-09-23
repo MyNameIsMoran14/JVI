@@ -162,3 +162,124 @@
   group: metabolism
   is_key: false
   aliases: ["LDH", "лактатдегидрогеназа"]
+
+# Иммунограмма (иммунофенотипирование лимфоцитов) — добавлено по реальному бланку,
+# не входит в стартовый список спеки, но лаборатории его назначают.
+- code: T_CD3_CD19NEG_PCT
+  name_ru: "Т-лимфоциты (CD3+CD19-), отн."
+  canonical_unit: "%"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Т-лимфоциты (CD3+CD19-) (отн.)", "Т-лимфоциты ( CD3+CD19-) (отн.)", "T-lymphocytes CD3+CD19-"]
+
+- code: T_CD3_CD19NEG_ABS
+  name_ru: "Т-лимфоциты (CD3+CD19-), абс."
+  canonical_unit: "10^9/л"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Т-лимфоциты (CD3+CD19-) (абс.)", "Т-лимфоциты ( CD3+CD19-) (абс.)"]
+
+- code: T_HELPER_CD4_PCT
+  name_ru: "Т-хелперы/индукторы (CD3+CD4+), отн."
+  canonical_unit: "%"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Т-хелперы/индукторы (CD3+CD4+) (отн.)", "T-хелперы CD4"]
+
+- code: T_HELPER_CD4_ABS
+  name_ru: "Т-хелперы/индукторы (CD3+CD4+), абс."
+  canonical_unit: "10^9/л"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Т-хелперы/индукторы (CD3+CD4+) (абс.)"]
+
+- code: T_CYTOTOX_CD8_PCT
+  name_ru: "Т-лимфоциты цитотоксические (CD3+CD8+), отн."
+  canonical_unit: "%"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Т-лимфоциты цитотоксические (CD3+CD8+) (отн.)"]
+
+- code: T_CYTOTOX_CD8_ABS
+  name_ru: "Т-лимфоциты цитотоксические (CD3+CD8+), абс."
+  canonical_unit: "10^9/л"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Т-лимфоциты цитотоксические (CD3+CD8+) (абс.)"]
+
+- code: IMMUNOREG_INDEX
+  name_ru: "Иммунорегуляторный индекс (CD3+CD4+/CD3+CD8+)"
+  canonical_unit: ""
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Иммунорегуляторный индекс", "CD4/CD8", "immunoregulatory index"]
+
+- code: NK_PCT
+  name_ru: "Натуральные киллеры (NK-клетки), отн."
+  canonical_unit: "%"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Натуральные киллеры (NK-клетки) (CD3-CD16+CD56+) (отн.)", "NK-клетки отн."]
+
+- code: NK_ABS
+  name_ru: "Натуральные киллеры (NK-клетки), абс."
+  canonical_unit: "10^9/л"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Натуральные киллеры (NK-клетки) (CD3-CD16+CD56+) (абс.)", "NK-клетки абс."]
+
+- code: NKT_PCT
+  name_ru: "NKT-клетки, отн."
+  canonical_unit: "%"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["NKT-клетки (CD3+CD16+CD56+) (отн.)"]
+
+- code: NKT_ABS
+  name_ru: "NKT-клетки, абс."
+  canonical_unit: "10^9/л"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["NKT-клетки (CD3+CD16+CD56+) (абс.)"]
+
+- code: B_LYMPH_PCT
+  name_ru: "В-лимфоциты (CD3-CD19+), отн."
+  canonical_unit: "%"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["В-лимфоциты (CD3-CD19+) (отн.)"]
+
+- code: B_LYMPH_ABS
+  name_ru: "В-лимфоциты (CD3-CD19+), абс."
+  canonical_unit: "10^9/л"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["В-лимфоциты (CD3-CD19+) (абс.)"]
+
+- code: NST_STIM_COEF
+  name_ru: "Коэффициент стимуляции НСТ-теста"
+  canonical_unit: ""
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Коэффициент стимуляции НСТ-теста"]
+
+- code: NST_SPONTANEOUS
+  name_ru: "Спонтанная метаболическая активность фагоцитов (НСТ сп.)"
+  canonical_unit: "у.е."
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Спонтанная метаболическая активность фагоцитов (НСТ сп.)", "НСТ спонтанный"]
+
+- code: NST_STIMULATED
+  name_ru: "Стимулированная метаболическая активность фагоцитов (НСТ ст.)"
+  canonical_unit: "у.е."
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Стимулированная метаболическая активность фагоцитов (НСТ ст.)", "НСТ стимулированный"]
+
+- code: CIC
+  name_ru: "Циркулирующие иммунные комплексы"
+  canonical_unit: "Ед/мл"
+  group: immunophenotyping
+  is_key: false
+  aliases: ["Циркулирующие иммунные комплексы", "ЦИК", "circulating immune complexes"]

@@ -5,7 +5,7 @@ from typing import Any
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.auth.models import User
 from app.core.config import settings
@@ -84,6 +84,11 @@ async def parse_document(ctx: dict, document_id: int) -> None:
             return
 
         uploader = await session.get(User, document.uploaded_by)
+        # Idempotency: a retried/duplicated job must replace prior unconfirmed results, not add to
+        # them — but never touch rows the user already confirmed.
+        await session.execute(
+            delete(LabResult).where(LabResult.document_id == document.id, LabResult.confirmed.is_(False))
+        )
         document.status = DocumentStatus.parsing
         await session.commit()
 
