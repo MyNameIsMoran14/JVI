@@ -1,0 +1,164 @@
+# Стартовый справочник ключевых показателей (docs/PROJECT_SPEC.md, раздел 5).
+# Сверить с гематологом и пополнять по мере появления новых бланков.
+# canonical_unit — единица, к которой приводятся все значения на графике (см. unit_conversions).
+
+- code: M_PROTEIN
+  name_ru: "M-градиент (парапротеин)"
+  canonical_unit: "г/л"
+  group: tumor_markers
+  is_key: true
+  aliases: ["M-протеин", "парапротеин", "M-компонент", "моноклональный протеин", "M-spike", "M-protein"]
+
+- code: FLC_KAPPA
+  name_ru: "Свободные лёгкие цепи каппа"
+  canonical_unit: "мг/л"
+  group: tumor_markers
+  is_key: true
+  aliases: ["FLC kappa", "free kappa", "kappa FLC", "свободные лёгкие цепи κ", "каппа"]
+
+- code: FLC_LAMBDA
+  name_ru: "Свободные лёгкие цепи лямбда"
+  canonical_unit: "мг/л"
+  group: tumor_markers
+  is_key: true
+  aliases: ["FLC lambda", "free lambda", "lambda FLC", "свободные лёгкие цепи λ", "лямбда"]
+
+- code: FLC_RATIO
+  name_ru: "Соотношение каппа/лямбда"
+  canonical_unit: ""
+  group: tumor_markers
+  is_key: true
+  aliases: ["FLC ratio", "k/l ratio", "kappa/lambda ratio", "κ/λ", "соотношение κ/λ"]
+
+- code: IGG
+  name_ru: "Иммуноглобулин G (IgG)"
+  canonical_unit: "г/л"
+  group: tumor_markers
+  is_key: true
+  aliases: ["IgG", "Ig G", "иммуноглобулин G"]
+
+- code: IGA
+  name_ru: "Иммуноглобулин A (IgA)"
+  canonical_unit: "г/л"
+  group: tumor_markers
+  is_key: false
+  aliases: ["IgA", "Ig A", "иммуноглобулин A"]
+
+- code: IGM
+  name_ru: "Иммуноглобулин M (IgM)"
+  canonical_unit: "г/л"
+  group: tumor_markers
+  is_key: false
+  aliases: ["IgM", "Ig M", "иммуноглобулин M"]
+
+- code: BENCE_JONES
+  name_ru: "Белок Бенс-Джонса в моче"
+  canonical_unit: "мг/л"
+  group: tumor_markers
+  is_key: false
+  aliases: ["Bence Jones", "белок BJ", "протеин Бенс-Джонса"]
+
+- code: HGB
+  name_ru: "Гемоглобин"
+  canonical_unit: "г/л"
+  group: blood
+  is_key: true
+  aliases: ["HGB", "Hb", "гемоглобин"]
+
+- code: WBC
+  name_ru: "Лейкоциты"
+  canonical_unit: "×10^9/л"
+  group: blood
+  is_key: true
+  aliases: ["WBC", "лейкоциты", "white blood cells"]
+
+- code: NEUT
+  name_ru: "Нейтрофилы"
+  canonical_unit: "×10^9/л"
+  group: blood
+  is_key: true
+  aliases: ["NEUT", "нейтрофилы", "neutrophils", "abs neut"]
+
+- code: PLT
+  name_ru: "Тромбоциты"
+  canonical_unit: "×10^9/л"
+  group: blood
+  is_key: true
+  aliases: ["PLT", "тромбоциты", "platelets"]
+
+- code: ESR
+  name_ru: "СОЭ"
+  canonical_unit: "мм/ч"
+  group: blood
+  is_key: false
+  aliases: ["ESR", "СОЭ", "скорость оседания эритроцитов"]
+
+- code: CREATININE
+  name_ru: "Креатинин"
+  canonical_unit: "мкмоль/л"
+  group: kidneys
+  is_key: true
+  aliases: ["creatinine", "креатинин", "Cr"]
+
+- code: GFR
+  name_ru: "СКФ (скорость клубочковой фильтрации)"
+  canonical_unit: "мл/мин/1.73м²"
+  group: kidneys
+  is_key: true
+  aliases: ["eGFR", "GFR", "СКФ"]
+
+- code: UREA
+  name_ru: "Мочевина"
+  canonical_unit: "ммоль/л"
+  group: kidneys
+  is_key: false
+  aliases: ["urea", "мочевина"]
+
+- code: URINE_PROTEIN
+  name_ru: "Белок в моче"
+  canonical_unit: "г/л"
+  group: kidneys
+  is_key: false
+  aliases: ["белок в моче", "proteinuria", "общий белок мочи"]
+
+- code: CALCIUM_TOTAL
+  name_ru: "Кальций общий"
+  canonical_unit: "ммоль/л"
+  group: metabolism
+  is_key: true
+  aliases: ["Ca", "кальций", "calcium total", "кальций общий"]
+
+- code: CALCIUM_ION
+  name_ru: "Кальций ионизированный"
+  canonical_unit: "ммоль/л"
+  group: metabolism
+  is_key: false
+  aliases: ["Ca2+", "ионизированный кальций", "ionized calcium"]
+
+- code: ALBUMIN
+  name_ru: "Альбумин"
+  canonical_unit: "г/л"
+  group: metabolism
+  is_key: true
+  aliases: ["альбумин", "albumin"]
+
+- code: TOTAL_PROTEIN
+  name_ru: "Общий белок"
+  canonical_unit: "г/л"
+  group: metabolism
+  is_key: false
+  aliases: ["общий белок", "total protein"]
+
+- code: BETA2_MICROGLOBULIN
+  name_ru: "β2-микроглобулин"
+  canonical_unit: "мг/л"
+  group: metabolism
+  is_key: true
+  aliases: ["b2-microglobulin", "бета2-микроглобулин", "beta-2-microglobulin"]
+
+- code: LDH
+  name_ru: "ЛДГ"
+  canonical_unit: "Ед/л"
+  group: metabolism
+  is_key: false
+  aliases: ["LDH", "лактатдегидрогеназа"]

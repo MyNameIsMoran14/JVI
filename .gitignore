@@ -1,0 +1,23 @@
+# env
+.env
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# node
+node_modules/
+dist/
+
+# uploaded files (local dev storage)
+/data/files/*
+!/data/files/.gitkeep
+
+# os
+.DS_Store
+Thumbs.db
