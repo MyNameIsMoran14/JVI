@@ -23,6 +23,7 @@ from app.extraction.preprocess import (
     strip_header_lines,
 )
 from app.extraction.schemas import LabItem
+from app.extraction.service import get_or_create_unmatched_analyte
 
 logger = logging.getLogger(__name__)
 
@@ -125,15 +126,19 @@ async def parse_document(ctx: dict, document_id: int) -> None:
         conversions = list((await session.execute(select(UnitConversion))).scalars())
         taken_at = report.taken_at or document.taken_at or date.today()
 
-        rows: list[tuple[Analyte, LabItem, ResultFlag | None]] = []
-        unmatched: list[str] = []
+        rows: list[tuple[Analyte, LabItem, ResultFlag | None, bool]] = []
         notes: list[str] = []
 
         for item in report.items:
             analyte, confidence = match_analyte(item.raw_name, analytes)
+            is_new_analyte = False
             if analyte is None:
-                unmatched.append(item.raw_name)
-                continue
+                # Nothing gets dropped — an unrecognized label becomes a new analyte instead,
+                # so it's on the graph from the first time it's ever seen.
+                analyte = await get_or_create_unmatched_analyte(session, item.raw_name, item.unit)
+                analytes.append(analyte)
+                confidence = 1.0
+                is_new_analyte = True
 
             value_canonical: float | None = None
             if item.value is not None:
@@ -167,7 +172,7 @@ async def parse_document(ctx: dict, document_id: int) -> None:
                     confirmed=False,
                 )
             )
-            rows.append((analyte, item, flag))
+            rows.append((analyte, item, flag, is_new_analyte))
 
         document.status = DocumentStatus.needs_review
         document.lab_name = document.lab_name or report.lab_name
@@ -182,14 +187,15 @@ async def parse_document(ctx: dict, document_id: int) -> None:
             )
             return
 
+        new_count = sum(1 for *_, is_new in rows if is_new)
         lines = [f"Разобрал анализ от {taken_at.strftime('%d.%m.%Y')} ({len(rows)} показателей):"]
-        for analyte, item, flag in rows:
+        for analyte, item, flag, is_new_analyte in rows:
             marker = f" {FLAG_LABEL[flag]}" if flag else ""
-            lines.append(f"• {analyte.name_ru}: {_format_value(item, item.unit)}{marker}")
+            prefix = "🆕 " if is_new_analyte else "• "
+            lines.append(f"{prefix}{analyte.name_ru}: {_format_value(item, item.unit)}{marker}")
 
-        if unmatched:
-            lines.append(f"\nНе распознал ({len(unmatched)}, не сохранится в базу, нужна ручная проверка):")
-            lines.extend(f"• {name}" for name in unmatched)
+        if new_count:
+            lines.append(f"\n🆕 — новый показатель ({new_count}), добавлен в справочник впервые.")
 
         if notes:
             lines.append("\nОбратите внимание:")

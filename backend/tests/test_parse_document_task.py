@@ -98,18 +98,25 @@ async def test_parse_document_saves_matched_results_and_notifies(
         from sqlalchemy import select
 
         results = list((await verify_session.execute(select(LabResult))).scalars())
-        assert len(results) == 1
-        result = results[0]
-        assert result.analyte_id == hgb.id
-        assert result.value == 118
-        assert result.value_canonical == 118
-        assert result.flag.value == "L"
-        assert result.confirmed is False
+        assert len(results) == 2
+        hgb_result = next(r for r in results if r.analyte_id == hgb.id)
+        assert hgb_result.value == 118
+        assert hgb_result.value_canonical == 118
+        assert hgb_result.flag.value == "L"
+        assert hgb_result.confirmed is False
+
+        new_result = next(r for r in results if r.analyte_id != hgb.id)
+        new_analyte = await verify_session.get(Analyte, new_result.analyte_id)
+        assert new_analyte is not None
+        assert new_analyte.name_ru == "Совсем неизвестный показатель"
+        assert new_analyte.group == "auto"
+        assert new_result.value == 1
+        assert new_result.value_canonical == 1  # canonical_unit was seeded from the item's own unit
 
     assert len(notifications) == 1
     _, text, markup = notifications[0]
     assert "Гемоглобин" in text
-    assert "Не распознал" in text
+    assert "🆕" in text
     assert "Совсем неизвестный показатель" in text
     assert markup is not None
 

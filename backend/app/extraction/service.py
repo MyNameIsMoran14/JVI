@@ -1,8 +1,37 @@
-from sqlalchemy import delete, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.documents.models import Document, DocumentStatus
-from app.extraction.models import LabResult
+from app.extraction.models import Analyte, LabResult
+from app.extraction.normalize import slugify_code
+
+
+async def get_or_create_unmatched_analyte(
+    session: AsyncSession, raw_name: str, unit: str | None
+) -> Analyte:
+    """Registers a not-yet-known analyte instead of dropping it — nothing gets lost.
+
+    The code is deterministic from raw_name, so the same unrecognized label reuses the
+    same analyte on later uploads instead of spawning duplicates. `canonical_unit` is
+    just whatever unit the form printed — there's no reference conversion table for it yet.
+    """
+    code = slugify_code(raw_name)
+    existing = await session.execute(select(Analyte).where(Analyte.code == code))
+    analyte = existing.scalar_one_or_none()
+    if analyte is not None:
+        return analyte
+
+    analyte = Analyte(
+        code=code,
+        name_ru=raw_name,
+        canonical_unit=unit,
+        aliases=[raw_name],
+        group="auto",
+        is_key=False,
+    )
+    session.add(analyte)
+    await session.flush()
+    return analyte
 
 
 async def confirm_document(session: AsyncSession, document_id: int) -> int:

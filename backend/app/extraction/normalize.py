@@ -1,3 +1,6 @@
+import hashlib
+import re
+
 from rapidfuzz import fuzz, process
 
 from app.extraction.models import Analyte, ResultFlag, UnitConversion
@@ -64,6 +67,14 @@ def compute_flag(
     if ref_high is not None and value > ref_high:
         return ResultFlag.high
     return ResultFlag.normal
+
+
+def slugify_code(raw_name: str) -> str:
+    """Deterministic analyte code from a raw label — same input always yields the same code,
+    so re-registering the same unrecognized label later reuses it instead of duplicating."""
+    ascii_part = re.sub(r"[^A-Za-z0-9]+", "_", raw_name.strip()).strip("_").upper()[:30]
+    digest = hashlib.sha1(raw_name.strip().lower().encode("utf-8")).hexdigest()[:8]
+    return f"AUTO_{ascii_part}_{digest}" if ascii_part else f"AUTO_{digest}"
 
 
 def detect_jump(new_value: float, previous_value: float) -> bool:

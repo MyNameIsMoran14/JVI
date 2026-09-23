@@ -1,5 +1,5 @@
 from app.extraction.models import Analyte, ResultFlag, UnitConversion
-from app.extraction.normalize import compute_flag, convert_unit, detect_jump, match_analyte
+from app.extraction.normalize import compute_flag, convert_unit, detect_jump, match_analyte, slugify_code
 
 
 def _hgb() -> Analyte:
@@ -96,3 +96,17 @@ def test_detect_jump_false() -> None:
 
 def test_detect_jump_ignores_non_positive() -> None:
     assert detect_jump(new_value=0, previous_value=10) is False
+
+
+def test_slugify_code_deterministic() -> None:
+    assert slugify_code("Новый неизвестный показатель") == slugify_code("Новый неизвестный показатель")
+
+
+def test_slugify_code_differs_for_different_names() -> None:
+    assert slugify_code("Показатель А") != slugify_code("Показатель Б")
+
+
+def test_slugify_code_handles_pure_cyrillic() -> None:
+    code = slugify_code("Циркулирующие иммунные комплексы")
+    assert code.startswith("AUTO_")
+    assert code.isascii()
