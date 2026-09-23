@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User, UserRole
@@ -95,8 +96,6 @@ async def test_parse_document_saves_matched_results_and_notifies(
         assert refreshed is not None
         assert refreshed.status == DocumentStatus.needs_review
 
-        from sqlalchemy import select
-
         results = list((await verify_session.execute(select(LabResult))).scalars())
         assert len(results) == 2
         hgb_result = next(r for r in results if r.analyte_id == hgb.id)
@@ -119,6 +118,53 @@ async def test_parse_document_saves_matched_results_and_notifies(
     assert "🆕" in text
     assert "Совсем неизвестный показатель" in text
     assert markup is not None
+
+
+async def test_parse_document_auto_confirms_when_nothing_needs_review(
+    session: AsyncSession,
+    files_dir: Path,
+    db_session_maker: Callable[[], AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document, _patient, _user = await _make_fixture_document(session, files_dir)
+
+    hgb = Analyte(
+        code="HGB", name_ru="Гемоглобин", canonical_unit="г/л", aliases=["HGB"], group="blood", is_key=True
+    )
+    session.add(hgb)
+    await session.commit()
+
+    async def fake_extract(*, text: str | None = None, images_b64: list[str] | None = None) -> LabReport:
+        return LabReport(
+            taken_at=date(2026, 1, 15),
+            lab_name="Тестовая лаборатория",
+            items=[LabItem(raw_name="HGB", value=140, unit="г/л", ref_low=130, ref_high=160)],
+        )
+
+    notifications: list[tuple] = []
+
+    async def fake_notify(uploader, text, markup=None) -> None:  # noqa: ANN001
+        notifications.append((uploader, text, markup))
+
+    monkeypatch.setattr(tasks_module, "extract_lab_report", fake_extract)
+    monkeypatch.setattr(tasks_module, "_notify", fake_notify)
+    monkeypatch.setattr(tasks_module, "async_session_maker", db_session_maker)
+
+    await tasks_module.parse_document({}, document.id)
+
+    async with db_session_maker() as verify_session:
+        refreshed = await verify_session.get(Document, document.id)
+        assert refreshed is not None
+        assert refreshed.status == DocumentStatus.confirmed
+
+        results = list((await verify_session.execute(select(LabResult))).scalars())
+        assert len(results) == 1
+        assert results[0].confirmed is True
+
+    assert len(notifications) == 1
+    _, text, markup = notifications[0]
+    assert "сохранил автоматически" in text
+    assert markup is None
 
 
 async def test_parse_document_marks_failed_on_extraction_error(

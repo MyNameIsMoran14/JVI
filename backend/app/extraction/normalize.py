@@ -13,6 +13,17 @@ def _norm(value: str) -> str:
     return value.strip().lower()
 
 
+_SUPERSCRIPT_DIGITS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+
+
+def _norm_unit(unit: str) -> str:
+    """Same as _norm, but also folds unicode superscripts to caret notation — a lab printing
+    "10⁹/л" and our dictionary saying "10^9/л" are the same unit, not an unknown one."""
+    text = _norm(unit)
+    text = re.sub(r"(\d)([⁰¹²³⁴⁵⁶⁷⁸⁹]+)", lambda m: m.group(1) + "^" + m.group(2).translate(_SUPERSCRIPT_DIGITS), text)
+    return text.translate(_SUPERSCRIPT_DIGITS)
+
+
 def match_analyte(raw_name: str, analytes: list[Analyte]) -> tuple[Analyte | None, float]:
     """Matches a raw label from a lab form to a known analyte.
 
@@ -42,16 +53,19 @@ def convert_unit(
     value: float, unit: str | None, analyte: Analyte, conversions: list[UnitConversion]
 ) -> tuple[float | None, str | None]:
     """Converts a value to the analyte's canonical unit. Returns (value_canonical, issue)."""
-    if unit is None:
-        return None, "не указана единица измерения"
+    canonical = _norm_unit(analyte.canonical_unit or "")
 
-    normalized_unit = _norm(unit)
-    canonical = _norm(analyte.canonical_unit or "")
+    if unit is None:
+        # No unit column on the form at all (e.g. an index/coefficient) is only a problem
+        # if the analyte actually expects one.
+        return (value, None) if not canonical else (None, "не указана единица измерения")
+
+    normalized_unit = _norm_unit(unit)
     if not canonical or normalized_unit == canonical:
         return value, None
 
     for conversion in conversions:
-        if conversion.analyte_id == analyte.id and _norm(conversion.from_unit) == normalized_unit:
+        if conversion.analyte_id == analyte.id and _norm_unit(conversion.from_unit) == normalized_unit:
             return value * float(conversion.factor), None
 
     return None, f"неизвестная единица «{unit}», нужна ручная проверка"

@@ -66,6 +66,24 @@ def test_convert_unit_missing_unit() -> None:
     assert issue == "не указана единица измерения"
 
 
+def test_convert_unit_missing_unit_is_fine_for_dimensionless_analyte() -> None:
+    index = Analyte(
+        id=2, code="IRI", name_ru="Индекс", canonical_unit="", aliases=[], group="x", is_key=False
+    )
+    value, issue = convert_unit(0.36, None, index, [])
+    assert value == 0.36
+    assert issue is None
+
+
+def test_convert_unit_normalizes_unicode_superscript() -> None:
+    wbc = Analyte(
+        id=3, code="WBC", name_ru="Лейкоциты", canonical_unit="10^9/л", aliases=[], group="blood", is_key=True
+    )
+    value, issue = convert_unit(5.0, "10⁹/л", wbc, [])
+    assert value == 5.0
+    assert issue is None
+
+
 def test_compute_flag_low() -> None:
     assert compute_flag(90, ref_low=130, ref_high=160) == ResultFlag.low
 

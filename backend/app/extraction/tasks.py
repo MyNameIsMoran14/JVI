@@ -5,7 +5,7 @@ from typing import Any
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 from app.auth.models import User
 from app.core.config import settings
@@ -201,8 +201,20 @@ async def parse_document(ctx: dict, document_id: int) -> None:
             lines.append("\nОбратите внимание:")
             lines.extend(f"• {note}" for note in notes)
 
-        lines.append("\nВсё верно?")
+        # Nothing uncertain (no unit issues, no jumps, no brand-new indicators) → save outright.
+        # Confirmation is only worth the tap when something actually needs a human look.
+        needs_review = bool(notes) or new_count > 0
+        if not needs_review:
+            await session.execute(
+                update(LabResult).where(LabResult.document_id == document.id).values(confirmed=True)
+            )
+            document.status = DocumentStatus.confirmed
+            await session.commit()
+            lines.append("\nВсё сошлось с референсами и справочником — сохранил автоматически.")
+            await _notify(uploader, "\n".join(lines))
+            return
 
+        lines.append("\nВсё верно?")
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
