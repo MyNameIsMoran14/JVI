@@ -1,6 +1,9 @@
 # env
 .env
 
+# local-only project context
+CLAUDE.md
+
 # python
 __pycache__/
 *.py[cod]
