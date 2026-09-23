@@ -146,9 +146,15 @@ async def test_parse_document_auto_confirms_when_nothing_needs_review(
     async def fake_notify(uploader, text, markup=None) -> None:  # noqa: ANN001
         notifications.append((uploader, text, markup))
 
+    summary_calls: list[int] = []
+
+    async def fake_rebuild_summary(_session, patient_id: int) -> None:  # noqa: ANN001
+        summary_calls.append(patient_id)
+
     monkeypatch.setattr(tasks_module, "extract_lab_report", fake_extract)
     monkeypatch.setattr(tasks_module, "_notify", fake_notify)
     monkeypatch.setattr(tasks_module, "async_session_maker", db_session_maker)
+    monkeypatch.setattr(tasks_module, "rebuild_patient_summary", fake_rebuild_summary)
 
     await tasks_module.parse_document({}, document.id)
 
@@ -160,6 +166,8 @@ async def test_parse_document_auto_confirms_when_nothing_needs_review(
         results = list((await verify_session.execute(select(LabResult))).scalars())
         assert len(results) == 1
         assert results[0].confirmed is True
+
+    assert summary_calls == [document.patient_id]
 
     assert len(notifications) == 1
     _, text, markup = notifications[0]

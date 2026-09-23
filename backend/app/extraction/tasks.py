@@ -7,6 +7,7 @@ from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy import delete, select, update
 
+from app.assistant.summary import rebuild_patient_summary
 from app.auth.models import User
 from app.core.config import settings
 from app.core.db import async_session_maker
@@ -210,6 +211,7 @@ async def parse_document(ctx: dict, document_id: int) -> None:
             )
             document.status = DocumentStatus.confirmed
             await session.commit()
+            await rebuild_patient_summary(session, document.patient_id)
             lines.append("\nВсё сошлось с референсами и справочником — сохранил автоматически.")
             await _notify(uploader, "\n".join(lines))
             return

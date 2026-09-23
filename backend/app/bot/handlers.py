@@ -1,7 +1,17 @@
 from aiogram import F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from sqlalchemy import select
 
+from app.assistant.chat import ask_assistant
+from app.assistant.models import Conversation, Message as AssistantMessage, MessageRole
+from app.assistant.service import (
+    add_doctor_question,
+    get_or_create_conversation,
+    list_open_questions,
+    toggle_pin,
+)
+from app.assistant.summary import rebuild_patient_summary
 from app.auth.service import get_or_create_user
 from app.core.db import async_session_maker
 from app.core.queue import get_arq_pool
@@ -15,10 +25,12 @@ router = Router()
 WELCOME_TEXT = (
     "Привет! Я медицинский помощник семьи.\n\n"
     "Пришлите фото или PDF анализа или выписки — я его сохраню и распознаю.\n"
-    "Чат с AI-помощником появится на следующем этапе."
+    "Любой другой текст — вопрос AI-помощнику, он знает историю болезни и анализы.\n"
+    "«Вопросы к врачу» — список того, что накопилось спросить на приёме."
 )
 
 CLASSIFY_KEYBOARD_TEMPLATE = "Что за файл?"
+QUESTIONS_TRIGGERS = {"/questions", "вопросы к врачу", "вопросы врачу", "вопросы"}
 
 
 @router.message(CommandStart())
@@ -84,12 +96,49 @@ async def handle_file(message: Message) -> None:
     )
 
 
+@router.message(Command("questions"))
+@router.message(F.text.func(lambda text: text.strip().lower() in QUESTIONS_TRIGGERS))
+async def handle_list_questions(message: Message) -> None:
+    async with async_session_maker() as session:
+        patient = await get_or_create_default_patient(session)
+        questions = await list_open_questions(session, patient.id)
+
+    if not questions:
+        await message.answer("Открытых вопросов к врачу пока нет.")
+        return
+
+    lines = ["Вопросы к врачу:"] + [f"{i}. {q.text}" for i, q in enumerate(questions, start=1)]
+    await message.answer("\n".join(lines))
+
+
 @router.message(F.text)
 async def handle_text(message: Message) -> None:
-    await message.answer(
-        "Чат с AI-помощником появится на следующем этапе. "
-        "Пока можно присылать фото или PDF анализов и выписок."
+    if message.from_user is None or message.bot is None or not message.text:
+        return
+
+    await message.bot.send_chat_action(message.chat.id, "typing")
+
+    async with async_session_maker() as session:
+        user = await get_or_create_user(
+            session, telegram_id=message.from_user.id, name=message.from_user.full_name
+        )
+        patient = await get_or_create_default_patient(session)
+        conversation = await get_or_create_conversation(session, patient_id=patient.id, user_id=user.id)
+        assistant_message = await ask_assistant(
+            session, conversation_id=conversation.id, patient_id=patient.id, question=message.text
+        )
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📌 Закрепить", callback_data=f"pin_msg:{assistant_message.id}"),
+                InlineKeyboardButton(
+                    text="➕ В вопросы врачу", callback_data=f"ask_doctor:{assistant_message.id}"
+                ),
+            ]
+        ]
     )
+    await message.answer(assistant_message.content, reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("classify_doc:"))
@@ -129,9 +178,16 @@ async def handle_confirm(callback: CallbackQuery) -> None:
     if callback.data is None:
         return
     document_id = int(callback.data.split(":", 1)[1])
+    # Answer first — rebuilding patient_summary below calls the LLM and can take a few
+    # seconds, longer than Telegram is happy to leave a callback tap unacknowledged.
+    await callback.answer("Сохранено")
+
     async with async_session_maker() as session:
         count = await confirm_document(session, document_id)
-    await callback.answer("Сохранено")
+        document = await session.get(Document, document_id)
+        if document is not None:
+            await rebuild_patient_summary(session, document.patient_id)
+
     if callback.message and isinstance(callback.message, Message):
         await callback.message.edit_text(
             f"{callback.message.text}\n\n✅ Сохранено ({count} показателей).", reply_markup=None
@@ -148,3 +204,53 @@ async def handle_discard(callback: CallbackQuery) -> None:
     await callback.answer("Удалено")
     if callback.message and isinstance(callback.message, Message):
         await callback.message.edit_text(f"{callback.message.text}\n\n🗑 Не сохранено.", reply_markup=None)
+
+
+@router.callback_query(F.data.startswith("pin_msg:"))
+async def handle_pin(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    message_id = int(callback.data.split(":", 1)[1])
+    async with async_session_maker() as session:
+        pinned = await toggle_pin(session, message_id)
+    if pinned is None:
+        await callback.answer("Сообщение не найдено")
+    else:
+        await callback.answer("Закреплено" if pinned else "Откреплено")
+
+
+@router.callback_query(F.data.startswith("ask_doctor:"))
+async def handle_ask_doctor(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    message_id = int(callback.data.split(":", 1)[1])
+
+    async with async_session_maker() as session:
+        assistant_message = await session.get(AssistantMessage, message_id)
+        if assistant_message is None:
+            await callback.answer("Сообщение не найдено")
+            return
+        conversation = await session.get(Conversation, assistant_message.conversation_id)
+        if conversation is None:
+            await callback.answer("Не получилось")
+            return
+
+        preceding_user_message = (
+            await session.execute(
+                select(AssistantMessage)
+                .where(
+                    AssistantMessage.conversation_id == assistant_message.conversation_id,
+                    AssistantMessage.id < assistant_message.id,
+                    AssistantMessage.role == MessageRole.user,
+                )
+                .order_by(AssistantMessage.id.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        question_text = preceding_user_message.content if preceding_user_message else assistant_message.content
+
+        await add_doctor_question(
+            session, patient_id=conversation.patient_id, text=question_text, source_message_id=message_id
+        )
+
+    await callback.answer("Добавлено в вопросы к врачу")
