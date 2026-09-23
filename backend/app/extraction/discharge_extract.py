@@ -17,7 +17,7 @@ async def transcribe_image(image_b64: str) -> str:
     client = get_llm_client()
     response = await client.chat.completions.create(
         model=settings.llm_vision_model,
-        max_tokens=MAX_OUTPUT_TOKENS,
+        max_completion_tokens=MAX_OUTPUT_TOKENS,
         messages=[
             {"role": "system", "content": TRANSCRIBE_PROMPT},
             {

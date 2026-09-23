@@ -62,7 +62,7 @@ async def extract_lab_report(*, text: str | None = None, images_b64: list[str] |
     client = get_llm_client()
     response = await client.chat.completions.create(
         model=model,
-        max_tokens=MAX_OUTPUT_TOKENS,
+        max_completion_tokens=MAX_OUTPUT_TOKENS,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system},
