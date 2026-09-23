@@ -11,14 +11,15 @@ from app.auth.models import User
 from app.core.config import settings
 from app.core.db import async_session_maker
 from app.documents.models import Document, DocumentStatus
+from app.extraction.discharge_extract import transcribe_image
 from app.extraction.llm_extract import extract_lab_report
 from app.extraction.models import Analyte, LabResult, ResultFlag, UnitConversion
 from app.extraction.normalize import compute_flag, convert_unit, detect_jump, match_analyte
 from app.extraction.preprocess import (
     crop_header,
     image_to_base64,
-    pdf_first_page_image,
-    pdf_first_page_text,
+    pdf_page_images,
+    pdf_text,
     strip_header_lines,
 )
 from app.extraction.schemas import LabItem
@@ -30,6 +31,8 @@ FLAG_LABEL = {
     ResultFlag.high: "↑ выше нормы",
     ResultFlag.normal: "",
 }
+
+DISCHARGE_PREVIEW_CHARS = 1500
 
 
 async def _latest_confirmed_canonical_value(
@@ -69,6 +72,10 @@ def _format_value(item: LabItem, unit_for_display: str | None) -> str:
     return item.value_text or "—"
 
 
+async def _read_file(document: Document) -> bytes:
+    return (Path(settings.files_dir) / document.file_path).read_bytes()
+
+
 async def parse_document(ctx: dict, document_id: int) -> None:
     async with async_session_maker() as session:
         document = await session.get(Document, document_id)
@@ -81,20 +88,24 @@ async def parse_document(ctx: dict, document_id: int) -> None:
         await session.commit()
 
         try:
-            file_bytes = (Path(settings.files_dir) / document.file_path).read_bytes()
+            file_bytes = await _read_file(document)
             text: str | None = None
-            image_b64: str | None = None
+            images_b64: list[str] | None = None
 
             if document.mime == "application/pdf":
-                page_text = pdf_first_page_text(file_bytes)
-                if page_text:
-                    text = strip_header_lines(page_text)
+                full_text = pdf_text(file_bytes)
+                if full_text:
+                    text = strip_header_lines(full_text)
                 else:
-                    image_b64 = image_to_base64(crop_header(pdf_first_page_image(file_bytes)))
+                    pages = pdf_page_images(file_bytes)
+                    images_b64 = [
+                        image_to_base64(crop_header(page) if i == 0 else page)
+                        for i, page in enumerate(pages)
+                    ]
             else:
-                image_b64 = image_to_base64(crop_header(file_bytes))
+                images_b64 = [image_to_base64(crop_header(file_bytes))]
 
-            report = await extract_lab_report(text=text, image_b64=image_b64)
+            report = await extract_lab_report(text=text, images_b64=images_b64)
         except Exception:
             logger.exception("extraction failed for document %s", document_id)
             document.status = DocumentStatus.failed
@@ -166,13 +177,13 @@ async def parse_document(ctx: dict, document_id: int) -> None:
             )
             return
 
-        lines = [f"Разобрал анализ от {taken_at.strftime('%d.%m.%Y')}:"]
+        lines = [f"Разобрал анализ от {taken_at.strftime('%d.%m.%Y')} ({len(rows)} показателей):"]
         for analyte, item, flag in rows:
             marker = f" {FLAG_LABEL[flag]}" if flag else ""
             lines.append(f"• {analyte.name_ru}: {_format_value(item, item.unit)}{marker}")
 
         if unmatched:
-            lines.append("\nНе распознал (не сохранится в базу, нужна ручная проверка):")
+            lines.append(f"\nНе распознал ({len(unmatched)}, не сохранится в базу, нужна ручная проверка):")
             lines.extend(f"• {name}" for name in unmatched)
 
         if notes:
@@ -190,3 +201,53 @@ async def parse_document(ctx: dict, document_id: int) -> None:
             ]
         )
         await _notify(uploader, "\n".join(lines), markup=keyboard)
+
+
+async def parse_discharge(ctx: dict, document_id: int) -> None:
+    """Transcribes a discharge summary / doctor's note into `document.raw_text`.
+
+    Unlike lab reports this has no numeric fields to validate against, so there's no
+    confirm/discard step — the recognized text is stored and shown straight away.
+    """
+    async with async_session_maker() as session:
+        document = await session.get(Document, document_id)
+        if document is None:
+            logger.warning("parse_discharge: document %s not found", document_id)
+            return
+
+        uploader = await session.get(User, document.uploaded_by)
+        document.status = DocumentStatus.parsing
+        await session.commit()
+
+        try:
+            file_bytes = await _read_file(document)
+
+            if document.mime == "application/pdf":
+                full_text = pdf_text(file_bytes)
+                if full_text:
+                    text = strip_header_lines(full_text)
+                else:
+                    pages = pdf_page_images(file_bytes)
+                    parts = [
+                        await transcribe_image(image_to_base64(crop_header(page) if i == 0 else page))
+                        for i, page in enumerate(pages)
+                    ]
+                    text = "\n\n".join(parts)
+            else:
+                text = await transcribe_image(image_to_base64(crop_header(file_bytes)))
+        except Exception:
+            logger.exception("discharge transcription failed for document %s", document_id)
+            document.status = DocumentStatus.failed
+            await session.commit()
+            await _notify(
+                uploader,
+                "Не получилось распознать выписку. Попробуйте прислать более чёткое фото или PDF.",
+            )
+            return
+
+        document.raw_text = text
+        document.status = DocumentStatus.confirmed
+        await session.commit()
+
+        preview = text if len(text) <= DISCHARGE_PREVIEW_CHARS else text[:DISCHARGE_PREVIEW_CHARS] + "…"
+        await _notify(uploader, f"Распознал выписку (#{document.id}):\n\n{preview}")

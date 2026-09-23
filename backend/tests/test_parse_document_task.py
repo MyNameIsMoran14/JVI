@@ -69,7 +69,7 @@ async def test_parse_document_saves_matched_results_and_notifies(
     session.add(hgb)
     await session.commit()
 
-    async def fake_extract(*, text: str | None = None, image_b64: str | None = None) -> LabReport:
+    async def fake_extract(*, text: str | None = None, images_b64: list[str] | None = None) -> LabReport:
         return LabReport(
             taken_at=date(2026, 1, 15),
             lab_name="Тестовая лаборатория",
@@ -122,7 +122,7 @@ async def test_parse_document_marks_failed_on_extraction_error(
 ) -> None:
     document, _patient, _user = await _make_fixture_document(session, files_dir)
 
-    async def failing_extract(*, text: str | None = None, image_b64: str | None = None) -> LabReport:
+    async def failing_extract(*, text: str | None = None, images_b64: list[str] | None = None) -> LabReport:
         raise RuntimeError("boom")
 
     notifications: list[tuple] = []

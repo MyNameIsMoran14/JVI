@@ -1,11 +1,11 @@
 from aiogram import F, Router
 from aiogram.filters import CommandStart
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from app.auth.service import get_or_create_user
 from app.core.db import async_session_maker
 from app.core.queue import get_arq_pool
-from app.documents.models import DocumentKind
+from app.documents.models import Document, DocumentKind
 from app.documents.service import save_document
 from app.extraction.service import confirm_document, discard_document
 from app.patient.service import get_or_create_default_patient
@@ -14,9 +14,11 @@ router = Router()
 
 WELCOME_TEXT = (
     "Привет! Я медицинский помощник семьи.\n\n"
-    "Пришлите фото или PDF анализа — я его сохраню и распознаю показатели.\n"
+    "Пришлите фото или PDF анализа или выписки — я его сохраню и распознаю.\n"
     "Чат с AI-помощником появится на следующем этапе."
 )
+
+CLASSIFY_KEYBOARD_TEMPLATE = "Что за файл?"
 
 
 @router.message(CommandStart())
@@ -59,7 +61,7 @@ async def handle_file(message: Message) -> None:
             session,
             patient_id=patient.id,
             uploaded_by=user.id,
-            kind=DocumentKind.lab,
+            kind=DocumentKind.other,  # classified below, once the user picks a button
             filename=filename,
             mime=mime,
             content=content,
@@ -69,20 +71,57 @@ async def handle_file(message: Message) -> None:
         await message.answer("Этот файл уже был загружен раньше.")
         return
 
-    await message.answer(f"Файл сохранён (#{document.id}). Распознаю, это ~30 сек.")
-    pool = await get_arq_pool()
-    try:
-        await pool.enqueue_job("parse_document", document.id)
-    finally:
-        await pool.aclose()
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📊 Анализы", callback_data=f"classify_doc:lab:{document.id}"),
+                InlineKeyboardButton(text="📄 Выписка", callback_data=f"classify_doc:discharge:{document.id}"),
+            ]
+        ]
+    )
+    await message.answer(
+        f"Файл сохранён (#{document.id}). {CLASSIFY_KEYBOARD_TEMPLATE}", reply_markup=keyboard
+    )
 
 
 @router.message(F.text)
 async def handle_text(message: Message) -> None:
     await message.answer(
         "Чат с AI-помощником появится на следующем этапе. "
-        "Пока можно присылать фото или PDF анализов."
+        "Пока можно присылать фото или PDF анализов и выписок."
     )
+
+
+@router.callback_query(F.data.startswith("classify_doc:"))
+async def handle_classify(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    _, kind_value, document_id_str = callback.data.split(":", 2)
+    document_id = int(document_id_str)
+
+    task_name = "parse_document" if kind_value == "lab" else "parse_discharge"
+    doc_kind = DocumentKind.lab if kind_value == "lab" else DocumentKind.discharge
+
+    async with async_session_maker() as session:
+        document = await session.get(Document, document_id)
+        if document is None:
+            await callback.answer("Файл не найден")
+            return
+        document.kind = doc_kind
+        await session.commit()
+
+    await callback.answer()
+    pool = await get_arq_pool()
+    try:
+        await pool.enqueue_job(task_name, document_id)
+    finally:
+        await pool.aclose()
+
+    if callback.message and isinstance(callback.message, Message):
+        label = "анализы" if kind_value == "lab" else "выписку"
+        await callback.message.edit_text(
+            f"{callback.message.text}\n\nРаспознаю как {label}, это ~30 сек.", reply_markup=None
+        )
 
 
 @router.callback_query(F.data.startswith("confirm_doc:"))
