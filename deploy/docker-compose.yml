@@ -1,4 +1,4 @@
-# Воркер (arq) и Caddy добавятся на этапах 2 и 4 плана (docs/PROJECT_SPEC.md, раздел 11).
+# Caddy добавится на этапе 4 плана (docs/PROJECT_SPEC.md, раздел 11).
 services:
   postgres:
     image: postgres:16
@@ -41,6 +41,18 @@ services:
       - postgres
       - redis
     command: python -m app.bot.main
+
+  worker:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file: ../.env
+    volumes:
+      - files_data:/data/files
+    depends_on:
+      - postgres
+      - redis
+    command: arq app.worker.WorkerSettings
 
 volumes:
   postgres_data:

@@ -1,19 +1,21 @@
 from aiogram import F, Router
 from aiogram.filters import CommandStart
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from app.auth.service import get_or_create_user
 from app.core.db import async_session_maker
+from app.core.queue import get_arq_pool
 from app.documents.models import DocumentKind
 from app.documents.service import save_document
+from app.extraction.service import confirm_document, discard_document
 from app.patient.service import get_or_create_default_patient
 
 router = Router()
 
 WELCOME_TEXT = (
     "Привет! Я медицинский помощник семьи.\n\n"
-    "Пришлите фото или PDF анализа — я его сохраню.\n"
-    "Распознавание показателей и чат с AI-помощником появятся на следующих этапах."
+    "Пришлите фото или PDF анализа — я его сохраню и распознаю показатели.\n"
+    "Чат с AI-помощником появится на следующем этапе."
 )
 
 
@@ -63,13 +65,16 @@ async def handle_file(message: Message) -> None:
             content=content,
         )
 
-    if created:
-        await message.answer(
-            f"Файл сохранён (#{document.id}). "
-            "Автоматическое распознавание показателей добавим на следующем этапе."
-        )
-    else:
+    if not created:
         await message.answer("Этот файл уже был загружен раньше.")
+        return
+
+    await message.answer(f"Файл сохранён (#{document.id}). Распознаю, это ~30 сек.")
+    pool = await get_arq_pool()
+    try:
+        await pool.enqueue_job("parse_document", document.id)
+    finally:
+        await pool.aclose()
 
 
 @router.message(F.text)
@@ -78,3 +83,29 @@ async def handle_text(message: Message) -> None:
         "Чат с AI-помощником появится на следующем этапе. "
         "Пока можно присылать фото или PDF анализов."
     )
+
+
+@router.callback_query(F.data.startswith("confirm_doc:"))
+async def handle_confirm(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    document_id = int(callback.data.split(":", 1)[1])
+    async with async_session_maker() as session:
+        count = await confirm_document(session, document_id)
+    await callback.answer("Сохранено")
+    if callback.message and isinstance(callback.message, Message):
+        await callback.message.edit_text(
+            f"{callback.message.text}\n\n✅ Сохранено ({count} показателей).", reply_markup=None
+        )
+
+
+@router.callback_query(F.data.startswith("discard_doc:"))
+async def handle_discard(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    document_id = int(callback.data.split(":", 1)[1])
+    async with async_session_maker() as session:
+        await discard_document(session, document_id)
+    await callback.answer("Удалено")
+    if callback.message and isinstance(callback.message, Message):
+        await callback.message.edit_text(f"{callback.message.text}\n\n🗑 Не сохранено.", reply_markup=None)

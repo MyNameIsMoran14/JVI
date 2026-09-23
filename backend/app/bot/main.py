@@ -21,7 +21,7 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dispatcher = Dispatcher()
-    dispatcher.message.middleware(WhitelistMiddleware())
+    dispatcher.update.outer_middleware(WhitelistMiddleware())
     dispatcher.include_router(router)
 
     await bot.delete_webhook(drop_pending_updates=True)
