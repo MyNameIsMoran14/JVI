@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
     env_file: ../.env
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8420:8000"
     volumes:
       - files_data:/data/files
     depends_on:
@@ -53,7 +53,11 @@ services:
       - redis
     command: arq app.worker.WorkerSettings
 
+  # caddy and frontend-build are for the real VPS deploy only — they don't start on a plain
+  # `docker compose up -d`, so local dev never fights other projects for ports 80/443.
+  # Bring them up explicitly with: docker compose --profile prod up -d
   frontend-build:
+    profiles: ["prod"]
     image: node:20-alpine
     working_dir: /app
     volumes:
@@ -62,6 +66,7 @@ services:
     command: sh -c "npm install && npm run build"
 
   caddy:
+    profiles: ["prod"]
     image: caddy:2-alpine
     restart: unless-stopped
     env_file: ../.env

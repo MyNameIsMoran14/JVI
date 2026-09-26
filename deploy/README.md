@@ -31,9 +31,11 @@ nano .env   # заполнить все ключи, DOMAIN=ваш-домен, MI
 ## 3. Запуск
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d --build
+docker compose -f deploy/docker-compose.yml --profile prod up -d --build
 docker compose -f deploy/docker-compose.yml exec api python -m app.extraction.seed
 ```
+
+`--profile prod` is required here — it's what brings up `caddy` and `frontend-build` (ports 80/443), which stay off on a plain `up -d` so local dev never fights other projects for those ports.
 
 Caddy сам получит сертификат Let's Encrypt для `DOMAIN` при первом запросе — подождать пару минут после первого `docker compose up`.
 
