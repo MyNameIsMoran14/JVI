@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port: 5327,
+    port: 58217, // deliberately obscure — 5173/3000/8080/5327-style ports keep colliding with other local projects
     strictPort: true,
     allowedHosts: true,
     proxy: {
